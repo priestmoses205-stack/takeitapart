@@ -256,6 +256,20 @@ header > * { pointer-events: auto; }
 #info .partslist { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 14px; }
 #info .partslist span { font-size: 10.5px; padding: 3px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); color: #b9c4d1; }
 
+
+/* ---------- generic modal (scan sheet) ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 22; display: grid; place-items: center; padding: 20px;
+  background: rgba(4, 4, 8, 0.74); backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity 0.28s;
+}
+.modal.show { opacity: 1; pointer-events: auto; }
+.modal .sheet {
+  width: min(460px, 100%); background: #12121a; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+  padding: 20px 20px 18px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  max-height: 92vh; overflow-y: auto;
+}
+
 /* ---------- scan modal ---------- */
 #scanModal .sheet { width: min(520px, 94vw); }
 #scanModal .mhead { display: flex; align-items: center; gap: 10px; font-size: 15px; }
