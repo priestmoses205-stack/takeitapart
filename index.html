@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08080c">
+<title>TakeItApart — 3D models you control with your hands</title>
+<meta name="description" content="Landmarks, organs, engines and machines made of glowing particles. Snap, point and pull them apart using nothing but your hands. Runs in your browser, video never leaves your device.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235e5ce6'/%3E%3Cstop offset='1' stop-color='%230a84ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='15' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='white' stroke-width='3.5' opacity='.9'/%3E%3Ccircle cx='32' cy='32' r='6' fill='white'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #08080c;
+  --panel: rgba(18, 18, 24, 0.82);
+  --panel-solid: #13131a;
+  --line: rgba(255, 255, 255, 0.09);
+  --txt: #eef1f6;
+  --muted: #9aa3b2;
+  --blue: #0a84ff;
+  --teal: #22d3ee;
+  --amber: #ffb020;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: #08080c; color: var(--txt);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#stage:active { cursor: grabbing; }
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 20% 15%, rgba(10, 132, 255, 0.16), transparent 70%),
+    radial-gradient(55% 45% at 82% 82%, rgba(34, 211, 238, 0.13), transparent 70%),
+    radial-gradient(40% 40% at 50% 50%, rgba(120, 90, 255, 0.10), transparent 70%);
+}
+
+/* ---------- top bar ---------- */
+header {
+  position: fixed; top: 0; left: 0; right: 0; padding: 14px 16px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  z-index: 6; pointer-events: none;
+}
+header > * { pointer-events: auto; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, #5e5ce6, #0a84ff);
+  display: grid; place-items: center; box-shadow: 0 6px 22px rgba(10, 132, 255, 0.35);
+}
+.logo i { width: 15px; height: 15px; border: 2.5px solid #fff; border-radius: 50%; display: block; opacity: 0.92; }
+.title b { display: block; font-size: 15px; letter-spacing: 0.2px; }
+.title span { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.hud { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.badge {
+  font-size: 11px; padding: 6px 10px; border-radius: 999px; background: var(--panel);
+  border: 1px solid var(--line); color: var(--muted); backdrop-filter: blur(12px);
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.badge b { color: var(--txt); font-weight: 600; }
+.badge .pip { width: 6px; height: 6px; border-radius: 50%; background: #5b6472; }
+.badge.live .pip { background: #34d399; box-shadow: 0 0 8px #34d399; }
+
+/* ---------- left rail ---------- */
+.rail {
+  position: fixed; left: 14px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 8px; z-index: 6;
+}
+.rbtn {
+  width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--muted); font-size: 15px; cursor: pointer;
+  display: grid; place-items: center; backdrop-filter: blur(12px); transition: 0.15s;
+}
+.rbtn:hover { color: #fff; border-color: rgba(255, 255, 255, 0.22); }
+.rbtn.on { color: #fff; background: rgba(10, 132, 255, 0.9); border-color: transparent; }
+
+/* ---------- model switcher ---------- */
+.navbtns {
+  position: fixed; left: 14px; bottom: 18px; display: flex; gap: 8px; z-index: 6;
+}
+.navbtns button {
+  height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--txt); font-size: 12.5px; cursor: pointer; backdrop-filter: blur(12px);
+}
+.navbtns button:hover { border-color: rgba(255, 255, 255, 0.24); }
+
+/* ---------- labels ---------- */
+#labels { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 4; }
+#labels.show { opacity: 1; }
+.lab {
+  position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer;
+  font-size: 11px; padding: 4px 9px; border-radius: 999px; white-space: nowrap;
+  background: rgba(10, 12, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #cfd6e2; backdrop-filter: blur(8px); transition: 0.18s;
+}
+.lab:hover, .lab.on { background: #0a84ff; border-color: transparent; color: #fff; }
+
+/* ---------- info card ---------- */
+#info {
+  position: fixed; right: 14px; bottom: 20px; width: min(320px, calc(100vw - 100px));
+  background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px 16px; z-index: 7; opacity: 0; transform: translateY(10px); pointer-events: none;
+  transition: 0.22s; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+#info.show { opacity: 1; transform: none; pointer-events: auto; }
+.infohead { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 14px; }
+.infohead .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px var(--teal); }
+#info p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+#infoClose {
+  position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #6b7484;
+  font-size: 16px; cursor: pointer;
+}
+
+/* ---------- picker ---------- */
+#picker {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; padding: 14px 16px 18px;
+  background: linear-gradient(to top, rgba(6, 6, 10, 0.97), rgba(6, 6, 10, 0.75));
+  border-top: 1px solid var(--line); transform: translateY(110%); transition: 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 62vh; overflow-y: auto; backdrop-filter: blur(16px);
+}
+#picker.show { transform: none; }
+.cat { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.catname {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1.3px; color: #5f6878;
+  min-width: 82px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); color: #cfd6e2;
+  font-size: 12.5px; cursor: pointer; transition: 0.15s;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.1); }
+.chip.on { background: var(--blue); border-color: transparent; color: #fff; }
+.chip .ic { font-size: 14px; }
+
+/* ---------- quiz bar ---------- */
+#quizBar {
+  position: fixed; left: 50%; top: 70px; transform: translate(-50%, -12px); z-index: 7;
+  background: var(--panel-solid); border: 1px solid rgba(255, 179, 32, 0.35); border-radius: 14px;
+  padding: 12px 16px; display: none; align-items: center; gap: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+}
+#quizBar.show { display: flex; }
+#quizBar .qt { font-size: 12.5px; color: var(--muted); }
+#quizBar .qt b { color: var(--amber); }
+#quizBar button {
+  border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--txt);
+  border-radius: 9px; padding: 6px 11px; font-size: 11.5px; cursor: pointer;
+}
+.quizres { font-size: 12px; }
+.quizres.ok { color: #34d399; }
+.quizres.bad { color: #f87171; }
+
+/* ---------- welcome ---------- */
+#welcome {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px;
+  background: rgba(4, 4, 8, 0.72); backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none; transition: opacity 0.35s;
+}
+#welcome.show { opacity: 1; pointer-events: auto; }
+.wcard {
+  width: min(440px, 100%); background: #12121a; border: 1px solid var(--line); border-radius: 22px;
+  padding: 26px 24px 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); text-align: center;
+  max-height: 92vh; overflow-y: auto;
+}
+.wlogo {
+  width: 46px; height: 46px; border-radius: 13px; margin: 0 auto 14px;
+  background: linear-gradient(135deg, #5e5ce6, #0a84ff); display: grid; place-items: center;
+}
+.wlogo i { width: 20px; height: 20px; border: 3px solid #fff; border-radius: 50%; display: block; }
+.wcard h1 { font-size: 21px; margin: 0 0 8px; letter-spacing: -0.2px; }
+.wcard > p { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.steps { text-align: left; display: grid; gap: 11px; margin-bottom: 20px; }
+.step { display: flex; gap: 11px; align-items: flex-start; }
+.step .sem {
+  flex: 0 0 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 14px;
+}
+.step:nth-child(1) .sem { background: rgba(255, 176, 32, 0.16); }
+.step:nth-child(2) .sem { background: rgba(255, 120, 60, 0.16); }
+.step:nth-child(3) .sem { background: rgba(52, 211, 153, 0.16); }
+.step:nth-child(4) .sem { background: rgba(10, 132, 255, 0.16); }
+.step b { display: block; font-size: 13px; margin-bottom: 2px; }
+.step span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+#btnCamera {
+  width: 100%; padding: 14px; border-radius: 14px; border: 0; cursor: pointer;
+  background: var(--blue); color: #fff; font-size: 14.5px; font-weight: 600;
+  box-shadow: 0 10px 26px rgba(10, 132, 255, 0.35);
+}
+#btnCamera:disabled { opacity: 0.6; cursor: default; }
+#btnCamera.on { background: #1b7f3b; box-shadow: none; }
+#btnNoCam {
+  background: none; border: 0; color: #6ea8ff; font-size: 12.5px; cursor: pointer;
+  margin-top: 12px; padding: 6px;
+}
+.wcard small { display: block; margin-top: 10px; font-size: 10.5px; color: #5f6878; line-height: 1.5; }
+
+/* ---------- help ---------- */
+#help {
+  position: fixed; inset: 0; z-index: 19; display: grid; place-items: center; padding: 20px;
+  background: rgba(4, 4, 8, 0.8); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: 0.25s;
+}
+#help.show { opacity: 1; pointer-events: auto; }
+.hcard {
+  width: min(560px, 100%); max-height: 88vh; overflow-y: auto; background: #12121a;
+  border: 1px solid var(--line); border-radius: 20px; padding: 24px;
+}
+.hcard h2 { margin: 0 0 4px; font-size: 18px; }
+.hcard p.sub { margin: 0 0 18px; color: var(--muted); font-size: 12.5px; }
+.hgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+@media (max-width: 560px) { .hgrid { grid-template-columns: 1fr; } }
+.hrow { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.hrow kbd {
+  flex: 0 0 auto; min-width: 62px; text-align: center; font-family: inherit; font-size: 11px;
+  padding: 3px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line); color: #cfd6e2;
+}
+.hrow span { color: var(--muted); line-height: 1.45; }
+#helpClose {
+  margin-top: 18px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06); color: var(--txt); font-size: 13px; cursor: pointer;
+}
+.sensbox { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.sensbox label { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 6px; }
+.sensbox input { width: 100%; }
+#camNote { margin-top: 12px; font-size: 11.5px; color: var(--amber); line-height: 1.5; }
+#cam { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; bottom: 0; right: 0; }
+
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="3D particle model viewport"></canvas>
+<video id="cam" playsinline muted></video>
+
+<header>
+  <div class="brand">
+    <div class="logo"><i></i></div>
+    <div class="title"><b>TakeItApart</b><span id="partCount">…</span></div>
+  </div>
+  <div class="hud">
+    <div class="badge" id="handBadge"><span class="pip"></span>Hand <b id="handLabel">camera off</b></div>
+    <div class="badge">Scene <b id="sceneLabel">formed</b></div>
+    <div class="badge">Open <b id="openVal">0%</b></div>
+  </div>
+</header>
+
+<div class="rail">
+  <button class="rbtn" id="tPicker" title="Browse all models (B)">▦</button>
+  <button class="rbtn" id="tLabels" title="Labels (L)">🏷</button>
+  <button class="rbtn" id="tTrail" title="Trails (T)">✧</button>
+  <button class="rbtn" id="tAuto" title="Auto-rotate (R)">↻</button>
+  <button class="rbtn" id="tSolid" title="Solid view (S)">◍</button>
+  <button class="rbtn" id="tQuiz" title="Quiz (Q)">?</button>
+  <button class="rbtn" id="tHelp" title="Help (H)">ⓘ</button>
+</div>
+
+<div class="navbtns">
+  <button id="btnPrev">← Prev</button>
+  <button id="btnForm">Form</button>
+  <button id="btnExplode">Explode</button>
+  <button id="btnNext">Next →</button>
+</div>
+
+<div id="labels"></div>
+
+<div id="info">
+  <button id="infoClose" aria-label="Close">×</button>
+  <div class="infohead"><span class="dot"></span>Part</div>
+  <p></p>
+</div>
+
+<div id="quizBar">
+  <div class="qt">Find: <b id="quizTarget">—</b></div>
+  <span class="quizres" id="quizResult"></span>
+  <button id="quizSkip">Skip</button>
+  <button id="quizDone">End quiz</button>
+</div>
+
+<div id="picker"></div>
+
+<div id="welcome">
+  <div class="wcard">
+    <div class="wlogo"><i></i></div>
+    <h1>Welcome to TakeItApart</h1>
+    <p>Landmarks, the human body, engines and machines built from glowing particles, controlled by your hand.</p>
+    <div class="steps">
+      <div class="step"><div class="sem">🫰</div><div><b>Snap to summon</b><span>Snap your fingers and the particles appear. Make a fist to form the model.</span></div></div>
+      <div class="step"><div class="sem">✋</div><div><b>Open to explore</b><span>Open your hand to explode organs and engines into every named part.</span></div></div>
+      <div class="step"><div class="sem">☝️</div><div><b>Point to learn</b><span>Point at a part to see what it does. Pinch to pull it out.</span></div></div>
+      <div class="step"><div class="sem">🙌</div><div><b>Twist, tilt and zoom</b><span>Turn your hand to rotate the model. Two hands to zoom. Show ✌ for the next model.</span></div></div>
+    </div>
+    <button id="btnCamera">Start with camera</button>
+    <button id="btnNoCam">Continue without camera</button>
+    <small>Hand tracking runs on this device. Video never leaves your computer.</small>
+    <div id="camNote"></div>
+  </div>
+</div>
+
+<div id="help">
+  <div class="hcard">
+    <h2>Controls</h2>
+    <p class="sub">Everything works with a mouse too. Hand gestures need a camera.</p>
+    <div class="hgrid">
+      <div class="hrow"><kbd>Space</kbd><span>Snap — summon / dissolve</span></div>
+      <div class="hrow"><kbd>F</kbd><span>Fist (form the model)</span></div>
+      <div class="hrow"><kbd>O</kbd><span>Open hand (explode)</span></div>
+      <div class="hrow"><kbd>V →</kbd><span>Next model</span></div>
+      <div class="hrow"><kbd>←</kbd><span>Previous model</span></div>
+      <div class="hrow"><kbd>B</kbd><span>Browse all models</span></div>
+      <div class="hrow"><kbd>↑ ↓</kbd><span>Exploded view (mouse wheel too)</span></div>
+      <div class="hrow"><kbd>Drag</kbd><span>Rotate the model</span></div>
+      <div class="hrow"><kbd>Click</kbd><span>Pick a part</span></div>
+      <div class="hrow"><kbd>R</kbd><span>Auto-rotate</span></div>
+      <div class="hrow"><kbd>L</kbd><span>Labels</span></div>
+      <div class="hrow"><kbd>T</kbd><span>Trails</span></div>
+      <div class="hrow"><kbd>S</kbd><span>Solid view</span></div>
+      <div class="hrow"><kbd>Q</kbd><span>Quiz</span></div>
+      <div class="hrow"><kbd>H</kbd><span>This help</span></div>
+      <div class="hrow"><kbd>Drop .json</kbd><span>Add your own object</span></div>
+    </div>
+    <div class="sensbox">
+      <label>Gesture sensitivity <span id="sensVal">Standard</span></label>
+      <input id="sens" type="range" min="0" max="100" value="50">
+      <p style="font-size:11px;color:#6b7484;margin:6px 0 0">“More forgiving” helps recognise less distinct hand poses.</p>
+    </div>
+    <button id="helpClose">Close</button>
+  </div>
+</div>
+
+<script type="module">
+function gt(t,e,o,n){let a=1/Math.tan(t/2),r=1/(o-n);return new Float32Array([a/e,0,0,0,0,a,0,0,0,0,(n+o)*r,-1,0,0,2*n*o*r,0])}function xt(t){let e=Math.cos(t),o=Math.sin(t);return new Float32Array([e,0,-o,0,0,1,0,0,o,0,e,0,0,0,0,1])}function wt(t){let e=Math.cos(t),o=Math.sin(t);return new Float32Array([1,0,0,0,0,e,o,0,0,-o,e,0,0,0,0,1])}function bt(t,e,o){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,t,e,o,1])}function lt(t,e){let o=new Float32Array(16);for(let n=0;n<4;n++)for(let a=0;a<4;a++){let r=0;for(let l=0;l<4;l++)r+=t[l*4+a]*e[n*4+l];o[n*4+a]=r}return o}function ct(t,e,o,n){let a=t[0]*e+t[4]*o+t[8]*n+t[12],r=t[1]*e+t[5]*o+t[9]*n+t[13],l=t[3]*e+t[7]*o+t[11]*n+t[15];return[a/l,r/l,l]}var yt=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 a_pos;
+layout(location=1) in vec3 a_exp;
+layout(location=2) in vec3 a_col;
+layout(location=3) in float a_part;
+uniform mat4 u_proj, u_view;
+uniform float u_open, u_sel, u_time, u_trail, u_size, u_solid;
+out vec3 v_col;
+out float v_glow;
+void main() {
+  vec3 p = mix(a_pos, a_exp, u_open);
+  // gentle breathing drift so the cloud feels alive
+  float ph = a_part * 1.7 + a_pos.x * 3.0;
+  p += vec3(sin(u_time * 0.9 + ph), cos(u_time * 1.1 + ph * 1.3), sin(u_time * 0.7 + ph * 0.7)) * 0.006;
+
+  vec4 mv = u_view * vec4(p, 1.0);
+  gl_Position = u_proj * mv;
+  float dist = -mv.z;
+  float isSel = step(abs(a_part - u_sel), 0.5);
+  gl_PointSize = (u_size * (1.0 + isSel * 0.55)) * (2.2 / max(dist, 0.1)) * (1.0 + u_trail * 0.35);
+
+  v_col = a_col * (1.0 + isSel * 0.9);
+  // fade the far side a little so the shape reads
+  v_glow = mix(0.55, 1.0, clamp(1.0 - (dist - 2.0) * 0.18, 0.0, 1.0));
+}`,vt=`#version 300 es
+precision highp float;
+in vec3 v_col;
+in float v_glow;
+uniform float u_alpha;
+out vec4 outColor;
+void main() {
+  vec2 d = gl_PointCoord - vec2(0.5);
+  float r = length(d);
+  if (r > 0.5) discard;
+  float core = smoothstep(0.5, 0.06, r);
+  float a = core * core * v_glow * u_alpha;
+  outColor = vec4(v_col * a, a);
+}`,U=class{constructor(e){this.canvas=e;let o=e.getContext("webgl2",{antialias:!0,alpha:!0,premultipliedAlpha:!0});if(!o)throw new Error("WebGL2 not available");this.gl=o;let n=(r,l)=>{let c=o.createShader(r);if(o.shaderSource(c,l),o.compileShader(c),!o.getShaderParameter(c,o.COMPILE_STATUS))throw new Error(o.getShaderInfoLog(c));return c},a=o.createProgram();if(o.attachShader(a,n(o.VERTEX_SHADER,yt)),o.attachShader(a,n(o.FRAGMENT_SHADER,vt)),o.linkProgram(a),!o.getProgramParameter(a,o.LINK_STATUS))throw new Error(o.getProgramInfoLog(a));this.prog=a,this.u={};for(let r of["u_proj","u_view","u_open","u_sel","u_time","u_trail","u_size","u_alpha","u_solid"])this.u[r]=o.getUniformLocation(a,r);o.enable(o.BLEND),o.blendFunc(o.ONE,o.ONE),o.clearColor(0,0,0,0),this.bufs=[],this.model=null}setModel(e){let o=this.gl;for(let h of this.bufs)o.deleteBuffer(h);this.bufs=[],this.model=e;let n=e.count,a=new Float32Array(n*3),r=new Float32Array(n*3),l=new Float32Array(n*3),c=new Float32Array(n),u=0;e.parts.forEach((h,f)=>{a.set(h.target,u*3),r.set(h.explodePos,u*3);for(let m=0;m<h.count;m++)l[(u+m)*3]=h.color[0],l[(u+m)*3+1]=h.color[1],l[(u+m)*3+2]=h.color[2],c[u+m]=f;u+=h.count});let d=(h,f,m)=>{let x=o.createBuffer();return o.bindBuffer(o.ARRAY_BUFFER,x),o.bufferData(o.ARRAY_BUFFER,h,o.STATIC_DRAW),this.bufs.push(x),{buf:x,loc:f,size:m}};this.attrs=[d(a,0,3),d(r,1,3),d(l,2,3),d(c,3,1)],this.n=n,this.vao=o.createVertexArray(),o.bindVertexArray(this.vao);for(let h of this.attrs)o.bindBuffer(o.ARRAY_BUFFER,h.buf),o.enableVertexAttribArray(h.loc),o.vertexAttribPointer(h.loc,h.size,o.FLOAT,!1,0,0);o.bindVertexArray(null);let i=0;e.parts.forEach(h=>{h.start=i,i+=h.count})}resize(){let e=Math.min(window.devicePixelRatio||1,2),o=this.canvas.clientWidth||window.innerWidth,n=this.canvas.clientHeight||window.innerHeight;return(this.canvas.width!==Math.floor(o*e)||this.canvas.height!==Math.floor(n*e))&&(this.canvas.width=Math.floor(o*e),this.canvas.height=Math.floor(n*e)),this.gl.viewport(0,0,this.canvas.width,this.canvas.height),[o,n]}draw({open:e,sel:o,time:n,trail:a,zoom:r,yaw:l,pitch:c,solid:u,alpha:d=1}){let i=this.gl,[h,f]=this.resize();if(i.clear(i.COLOR_BUFFER_BIT|i.DEPTH_BUFFER_BIT),!this.model)return;i.useProgram(this.prog),i.bindVertexArray(this.vao);let m=gt(.95,h/f,.1,60),x=4.2/(r||1),w=lt(bt(0,0,-x),lt(wt(c||0),xt(l||0)));i.uniformMatrix4fv(this.u.u_proj,!1,m),i.uniformMatrix4fv(this.u.u_view,!1,w),i.uniform1f(this.u.u_open,e),i.uniform1f(this.u.u_sel,o??-1),i.uniform1f(this.u.u_time,n),i.uniform1f(this.u.u_trail,a?1:0),i.uniform1f(this.u.u_size,u?5.5:4.2),i.uniform1f(this.u.u_alpha,d),i.uniform1f(this.u.u_solid,u?1:0),i.drawArrays(i.POINTS,0,this.n),i.bindVertexArray(null),this.lastView=w,this.lastProj=m}screenOf(e,o,n){let a=this.lastView,r=this.lastProj,l=ct(a,e,o,n),c=ct(r,l[0],l[1],l[2]);return[(c[0]*.5+.5)*this.canvas.clientWidth,(-c[1]*.5+.5)*this.canvas.clientHeight,c[2]]}};function E(t=1){let e=t>>>0;return()=>{e|=0,e=e+1831565813|0;let o=Math.imul(e^e>>>15,1|e);return o=o+Math.imul(o^o>>>7,61|o)^o,((o^o>>>14)>>>0)/4294967296}}var A=Math.PI*2;function M(t,e,o,n,a,r,l,c){let u=[];for(let d=0;d<l;d++){let i=Math.floor(c()*6),h=c()-.5,f=c()-.5,m=c()-.5;i===0?h=.5:i===1?h=-.5:i===2?f=.5:i===3?f=-.5:i===4?m=.5:m=-.5,u.push(t+h*n,e+f*a,o+m*r)}return u}function D(t,e,o,n,a,r,l=1){let c=[];for(let u=0;u<a;u++){let d=r()*2-1,i=r()*A,h=Math.sqrt(1-d*d);c.push(t+n*h*Math.cos(i),e+n*d*l,o+n*h*Math.sin(i))}return c}function et(t,e,o,n,a,r,l,c){let u=[];for(let d=0;d<l;d++){let i=c()*2-1,h=c()*A,f=Math.sqrt(1-i*i);u.push(t+n*f*Math.cos(h),e+a*i,o+r*f*Math.sin(h))}return u}function y(t,e,o,n,a,r,l,c,u="y",d=0){let i=[];for(let h=0;h<l;h++){let f=c(),m=c()*A,x=n+(a-n)*f,w=d?x*(d+(1-d)*Math.sqrt(c())):x,v=Math.cos(m)*w,b=Math.sin(m)*w,g=(f-.5)*r;u==="y"?i.push(t+v,e+g,o+b):u==="x"?i.push(t+g,e+v,o+b):i.push(t+v,e+b,o+g)}return i}function N(t,e,o,n,a,r,l,c,u="y"){let d=[];for(let i=0;i<l;i++){let h=c()*A,f=n+(c()-.5)*a,m=(c()-.5)*r,x=Math.cos(h)*f,w=Math.sin(h)*f;u==="y"?d.push(t+x,e+m,o+w):u==="x"?d.push(t+m,e+x,o+w):d.push(t+x,e+w,o+m)}return d}function C(t,e,o,n,a=1){let r=[],l=[],c=0;for(let u=0;u<t.length-1;u++){let d=t[u],i=t[u+1],h=Math.hypot(i[0]-d[0],i[1]-d[1],i[2]-d[2]);l.push([d,i,h]),c+=h}for(let u=0;u<o;u++){let d=n()*c,i=0,h=0;for(;i<l.length-1&&h+l[i][2]<d;)h+=l[i][2],i++;let[f,m,x]=l[i],w=x>0?(d-h)/x:0,v=[m[0]-f[0],m[1]-f[1],m[2]-f[2]],b=Math.hypot(...v)||1,g=[v[0]/b,v[1]/b,v[2]/b],T=Math.abs(g[1])>.9?[1,0,0]:[0,1,0],S=[g[1]*T[2]-g[2]*T[1],g[2]*T[0]-g[0]*T[2],g[0]*T[1]-g[1]*T[0]],I=Math.hypot(...S)||1,L=[S[0]/I,S[1]/I,S[2]/I],K=[g[1]*L[2]-g[2]*L[1],g[2]*L[0]-g[0]*L[2],g[0]*L[1]-g[1]*L[0]],it=n()*A,rt=e*(1-(1-a)*d/c),Z=Math.cos(it)*rt,tt=Math.sin(it)*rt;r.push(f[0]+(m[0]-f[0])*w+L[0]*Z+K[0]*tt,f[1]+(m[1]-f[1])*w+L[1]*Z+K[1]*tt,f[2]+(m[2]-f[2])*w+L[2]*Z+K[2]*tt)}return r}function Mt(t,e,o,n,a,r,l,c,u,d="y"){let i=[];for(let h=0;h<c;h++){let f=r+(l-r)*u(),m=u()*A,x=a*Math.sqrt(u()),w=n+Math.cos(m)*x,v=Math.sin(m)*x;d==="y"?i.push(t+Math.cos(f)*w,e+v,o+Math.sin(f)*w):i.push(t+Math.cos(f)*w,e+Math.sin(f)*w,o+v)}return i}function kt(t){let e=0,o=0,n=0,a=t.length/3;for(let r=0;r<t.length;r+=3)e+=t[r],o+=t[r+1],n+=t[r+2];return[e/a,o/a,n/a]}function Pt(t){let e=[1e9,1e9,1e9],o=[-1e9,-1e9,-1e9];for(let n=0;n<t.length;n+=3)for(let a=0;a<3;a++)t[n+a]<e[a]&&(e[a]=t[n+a]),t[n+a]>o[a]&&(o[a]=t[n+a]);return{lo:e,hi:o,size:[o[0]-e[0],o[1]-e[1],o[2]-e[2]]}}function P(t){let e=[];for(let i of t)e.push(...i.points);let o=Pt(e),n=(o.lo[0]+o.hi[0])/2,a=(o.lo[1]+o.hi[1])/2,r=(o.lo[2]+o.hi[2])/2,c=1.9/(Math.max(o.size[0],o.size[1],o.size[2])||1),u=[],d=0;for(let i of t){let h=i.points.length/3,f=new Float32Array(h*3),m=new Float32Array(h*3),x=kt(i.points),w=[x[0]-n,x[1]-a,x[2]-r],v=Math.hypot(...w)||1,b=i.explode||[w[0]/v*.85,w[1]/v*.85,w[2]/v*.85];for(let g=0;g<h;g++){let T=(i.points[g*3]-n)*c,S=(i.points[g*3+1]-a)*c,I=(i.points[g*3+2]-r)*c;f[g*3]=T,f[g*3+1]=S,f[g*3+2]=I,m[g*3]=T+b[0],m[g*3+1]=S+b[1],m[g*3+2]=I+b[2]}u.push({name:i.name,note:i.note||"",color:i.color,target:f,explodePos:m,count:h,centre:[(x[0]-n)*c,(x[1]-a)*c,(x[2]-r)*c]}),d+=h}return{parts:u,count:d}}function _t(){let t=E(11),e=[];e.push({name:"Left Ventricle",note:"Thick muscular wall. Pumps oxygenated blood into the aorta and round the body.",color:[.95,.25,.35],points:et(-.18,-.12,0,.34,.62,.34,9e3,t),explode:[-.5,-.45,.2]}),e.push({name:"Right Ventricle",note:"Thinner wall. Sends deoxygenated blood to the lungs.",color:[.55,.42,.95],points:et(.22,-.05,0,.3,.55,.3,7500,t),explode:[.55,-.4,.15]}),e.push({name:"Left Atrium",note:"Receives oxygen-rich blood returning from the lungs.",color:[.98,.45,.55],points:D(-.2,.42,.02,.26,4200,t,.9),explode:[-.3,.75,0]}),e.push({name:"Right Atrium",note:"Receives oxygen-poor blood from the body.",color:[.6,.5,1],points:D(.26,.36,0,.24,3800,t,.9),explode:[.6,.6,0]});let o=[[-.05,.42,0],[.02,.8,.02],[.2,1.02,.02],[.45,.95,0],[.5,.7,-.02],[.45,.3,-.03]];e.push({name:"Aorta",note:"The largest artery. Carries blood out of the heart in a high-pressure pulse.",color:[.95,.72,.3],points:C(o,.13,6500,t,.75),explode:[.1,.95,-.5]});let n=[[.3,.3,.05],[.45,.55,.1],[.3,.78,.1],[.05,.86,.05]];return e.push({name:"Pulmonary Artery",note:"Takes blood from the right ventricle to the lungs.",color:[.35,.65,1],points:C(n,.1,4200,t,.8),explode:[.55,.7,.45]}),e.push({name:"Coronary Arteries",note:"Feed the heart muscle itself. Blockage here is a heart attack.",color:[1,.35,.2],points:C([[-.4,.1,.3],[0,-.1,.36],[.35,-.35,.28]],.035,2600,t,.6),explode:[.2,-.15,.95]}),P(e)}function Tt(){let t=E(23),e=[];e.push({name:"Intake Casing",note:"Directs air into the fan with as little turbulence as possible.",color:[.68,.74,.82],points:y(0,.2,0,.78,.7,.5,6e3,t,"x",.92),explode:[-.35,.15,0]});let o=[];for(let n=0;n<22;n++){let a=n/22*A;for(let r=0;r<130;r++){let l=.16+t()*.55,u=t()*.42;o.push(-.28+u*.5,Math.cos(a)*l,Math.sin(a)*l)}}e.push({name:"Fan",note:"The big front blades. They pull in air and push it back as thrust.",color:[.75,.85,.95],points:o,explode:[-.9,0,0]});for(let n=0;n<3;n++)e.push({name:`Compressor Stage ${n+1}`,note:"Squeezes the air tighter each stage, heating it up.",color:[.55,.72,.95],points:N(-.02+n*.24,0,0,.42-n*.06,.06,.12,3200,t,"x"),explode:[-.2+n*.25,.55,0]});return e.push({name:"Combustion Chamber",note:"Fuel is sprayed in and burned. This is where the energy comes from.",color:[1,.55,.15],points:N(.78,0,0,.4,.16,.3,5200,t,"x"),explode:[.55,.1,.6]}),e.push({name:"Turbine",note:"The hot gas spins these blades, which drive the compressor and fan.",color:[.95,.35,.25],points:N(1.12,0,0,.34,.1,.22,4200,t,"x"),explode:[.95,-.2,0]}),e.push({name:"Drive Shaft",note:"Connects turbine to compressor and fan. One shaft, thousands of rpm.",color:[.5,.55,.62],points:y(.42,0,0,.07,.07,1.9,3e3,t,"x"),explode:[0,-.75,0]}),e.push({name:"Exhaust Nozzle",note:"Accelerates the hot gas out the back to make thrust.",color:[.6,.6,.66],points:y(1.42,0,0,.34,.26,.42,3200,t,"x",.9),explode:[1,.25,-.2]}),P(e)}function Lt(){let t=E(37),e=[],o=2.4,n=[[1,1],[1,-1],[-1,1],[-1,-1]];for(let r=0;r<4;r++){let[l,c]=n[r],u=[];for(let d=0;d<=14;d++){let i=d/14,h=.95*Math.pow(1-i,1.9)+.06;u.push([l*h,i*o,c*h])}e.push({name:`Leg ${r+1}`,note:"Each leg is a curved lattice that widens at the base to spread the load.",color:[.75,.62,.42],points:C(u,.045,4200,t,.8),explode:[l*.85,-.35,c*.85]})}e.push({name:"Base Arches",note:"Decorative arches that also stiffen the base.",color:[.82,.7,.48],points:Mt(0,.42,0,.72,.035,0,A,3600,t,"y"),explode:[0,-.75,0]}),e.push({name:"First Platform",note:"The first visitor level, about 57 m up in the real tower.",color:[.9,.8,.58],points:M(0,.78,0,1.1,.03,1.1,2600,t),explode:[0,.15,0]}),e.push({name:"Second Platform",note:"Second level, with the famous views over Paris.",color:[.9,.8,.58],points:M(0,1.5,0,.66,.03,.66,2200,t),explode:[0,.5,0]}),e.push({name:"Spire",note:"The antenna tip. Broadcast aerials live here.",color:[.95,.88,.72],points:C([[0,1.62,0],[0,1.95,0],[0,2.3,0],[0,2.45,0]],.05,2400,t,.35),explode:[0,.95,0]});let a=[];for(let r=0;r<900;r++){let l=t(),c=.95*Math.pow(1-l,1.9)+.06,u=Math.floor(t()*4),d=t()*2-1,i=l*o;u<2?a.push(d*c,i,(u===0?1:-1)*c):a.push((u===2?1:-1)*c,i,d*c)}return e.push({name:"Lattice Bracing",note:"18,038 iron pieces and 2.5 million rivets hold it together.",color:[.7,.6,.44],points:a,explode:[0,.35,0]}),P(e)}function At(){let t=E(53),e=[],o=[],n=[],a=[],r=[],l=3.2,c=260;for(let u=0;u<c;u++){let d=u/c,i=d*A*l,h=(d-.5)*2.6,f=.62,m=Math.cos(i)*f,x=Math.sin(i)*f,w=Math.cos(i+Math.PI)*f,v=Math.sin(i+Math.PI)*f;for(let b=0;b<26;b++)o.push(m+(t()-.5)*.07,h+(t()-.5)*.02,x+(t()-.5)*.07);for(let b=0;b<26;b++)n.push(w+(t()-.5)*.07,h+(t()-.5)*.02,v+(t()-.5)*.07);if(u%4===0)for(let b=0;b<30;b++){let g=t();a.push(m+(w-m)*g,h+(t()-.5)*.03,x+(v-x)*g)}}return e.push({name:"Strand A",note:"One sugar-phosphate backbone. Runs one way.",color:[.35,.75,1],points:o,explode:[-.75,0,.35]}),e.push({name:"Strand B",note:"The partner strand. Runs the opposite way (anti-parallel).",color:[.6,.45,1],points:n,explode:[.75,0,-.35]}),e.push({name:"Base Pairs",note:"A-T and G-C. The rungs of the ladder that carry the code.",color:[.95,.8,.35],points:a,explode:[0,.35,.9]}),P(e)}function Et(){let t=E(71),e=[];e.push({name:"Body Shell",note:"The monocoque. In a modern car it is the crash structure.",color:[.85,.2,.25],points:[...M(0,.12,0,3.2,.42,1.5,9e3,t),...M(0,.42,0,1.9,.34,1.34,5e3,t)],explode:[0,.6,0]}),e.push({name:"Cabin & Glass",note:"Glass and pillars. The greenhouse shape sets visibility and drag.",color:[.55,.75,.9],points:M(.05,.56,0,1.5,.3,1.28,3400,t),explode:[.15,1,0]});let o=[];for(let[n,a]of[[-1,.78],[-1,-.78],[1.05,.78],[1.05,-.78]])o.push(...y(n,-.16,a,.36,.36,.24,2600,t,"z",.55));return e.push({name:"Wheels & Tyres",note:"Only four small contact patches hold the whole car to the road.",color:[.2,.2,.22],points:o,explode:[0,-.75,0]}),e.push({name:"Brakes",note:"Discs and callipers. They turn motion into heat, fast.",color:[.95,.6,.2],points:[...y(-1,-.16,.92,.24,.24,.04,1200,t,"z"),...y(1.05,-.16,.92,.24,.24,.04,1200,t,"z")],explode:[0,-.2,.95]}),e.push({name:"Engine Block",note:"Cylinders, pistons, crankshaft. Fuel becomes rotation here.",color:[.6,.62,.68],points:[...M(.95,.16,0,.7,.42,.9,3400,t),...y(.95,.3,0,.22,.22,.3,1600,t,"y")],explode:[.95,.15,0]}),e.push({name:"Lights",note:"Head and tail lamps. Also the car's way of talking to other drivers.",color:[1,.95,.6],points:[...M(-1.6,.16,.5,.06,.14,.34,900,t),...M(-1.6,.16,-.5,.06,.14,.34,900,t),...M(1.6,.2,.5,.06,.12,.3,900,t),...M(1.6,.2,-.5,.06,.12,.3,900,t)],explode:[-1,.3,0]}),e.push({name:"Rear Wing",note:"Pushes the back tyres down at speed for grip.",color:[.3,.3,.34],points:M(1.5,.62,0,.22,.05,1.3,1400,t),explode:[.85,1,0]}),P(e)}function zt(){let t=E(97),e=[];return e.push({name:"Mainspring Barrel",note:"A coiled steel ribbon stores the energy. Wind it and it slowly unwinds.",color:[.95,.75,.35],points:y(0,0,0,.34,.34,.16,4200,t,"y",.75),explode:[-.55,.1,-.35]}),e.push({name:"Gear Train",note:"A chain of gears steps the slow barrel up to fast hands.",color:[.85,.7,.4],points:[...y(.34,.02,.1,.2,.2,.06,1800,t,"y",.6),...y(.1,.02,.32,.14,.14,.06,1400,t,"y",.6)],explode:[.35,.15,.55]}),e.push({name:"Escapement",note:"Ticks the energy out in equal steps. This is the actual heartbeat of a watch.",color:[.75,.8,.9],points:M(.42,.03,-.2,.2,.06,.16,1500,t),explode:[.85,.1,-.45]}),e.push({name:"Balance Wheel",note:"Swings back and forth 5 to 8 times a second, keeping perfect time.",color:[.95,.55,.3],points:N(0,.06,0,.3,.05,.06,3200,t,"y"),explode:[0,.65,0]}),e.push({name:"Dial & Hands",note:"What you actually read. Hour, minute, sometimes seconds.",color:[.95,.95,.98],points:[...y(0,.2,0,.62,.62,.01,3600,t,"y"),...M(.15,.22,0,.34,.01,.03,900,t),...M(0,.22,.1,.03,.01,.26,700,t)],explode:[0,1,0]}),e.push({name:"Case",note:"Protects the movement from dust, water and knocks.",color:[.65,.68,.72],points:N(0,0,0,.68,.08,.26,3800,t,"y"),explode:[0,-.7,0]}),P(e)}function St(){let t=E(131),e=[];return[["Stage 1 (S-IC)","The first stage: five engines, 3.4 million kg of thrust, burned in 2.5 minutes.",[.1,-.75,0],.34,[.92,.93,.96]],["Stage 2 (S-II)","Second stage takes over once the first is empty and dropped.",[.1,-.2,0],.3,[.96,.96,.98]],["Stage 3 (S-IVB)","Third stage. It also pushed Apollo out of Earth orbit toward the Moon.",[.1,.35,0],.27,[.9,.9,.94]]].forEach(([n,a,r,l,c],u)=>{let d=-1+u*.72;e.push({name:n,note:a,color:c,points:y(0,d,0,l,l*1.02,.66,5200,t,"y",.94),explode:[r[0],r[1]+.25,r[2]]})}),e.push({name:"F-1 Engines",note:"Five engines. Each one burns 2.5 tonnes of fuel per second.",color:[.55,.55,.6],points:[...y(.16,-1.35,.16,.07,.12,.22,1400,t,"y"),...y(-.16,-1.35,.16,.07,.12,.22,1400,t,"y"),...y(.16,-1.35,-.16,.07,.12,.22,1400,t,"y"),...y(-.16,-1.35,-.16,.07,.12,.22,1400,t,"y"),...y(0,-1.35,0,.07,.12,.22,1400,t,"y")],explode:[0,-.95,0]}),e.push({name:"Apollo Spacecraft",note:"Crew capsule plus the launch escape tower on top.",color:[.85,.85,.7],points:[...y(0,1.02,0,.2,.12,.16,2200,t,"y"),...C([[0,1.14,0],[0,1.34,0],[0,1.52,0]],.035,1200,t,.4)],explode:[0,1,0]}),e.push({name:"Fins",note:"Stabilisers. They keep the stack pointed the right way in the air.",color:[.75,.78,.85],points:[...M(.38,-.72,0,.16,.5,.04,900,t),...M(-.38,-.72,0,.16,.5,.04,900,t),...M(0,-.72,.38,.04,.5,.16,900,t),...M(0,-.72,-.38,.04,.5,.16,900,t)],explode:[0,-.2,.95]}),P(e)}function Ct(){let t=E(151),e=[];return e.push({name:"Sclera",note:"The white outer wall. Tough, and it holds the eye's shape.",color:[.93,.94,.96],points:D(0,0,0,.85,9e3,t),explode:[0,0,.9]}),e.push({name:"Cornea",note:"The clear front window. It does most of the focusing, not the lens.",color:[.5,.85,1],points:D(0,0,.78,.3,3600,t),explode:[0,0,1.15]}),e.push({name:"Iris",note:"The coloured ring. Muscles open and close it to control light.",color:[.35,.6,.45],points:N(0,0,.74,.3,.16,.02,3200,t,"z"),explode:[0,.9,.55]}),e.push({name:"Pupil",note:"Not a hole in the normal sense: it is the gap the iris opens.",color:[.08,.08,.1],points:y(0,0,.75,.13,.13,.02,1600,t,"z"),explode:[0,.45,.85]}),e.push({name:"Lens",note:"Flexible. It changes shape to fine-tune focus near and far.",color:[.7,.9,1],points:et(0,0,.52,.26,.26,.12,3200,t),explode:[0,-.1,.7]}),e.push({name:"Retina",note:"The light sensor. 120 million rods and 6 million cones line this wall.",color:[.95,.45,.45],points:D(0,0,-.06,.78,8e3,t),explode:[0,0,-.95]}),e.push({name:"Optic Nerve",note:"A million fibres carry the image to the brain. It is a bundle, not a wire.",color:[.95,.85,.4],points:C([[0,-.1,-.8],[.1,-.35,-1.2],[.2,-.5,-1.6]],.11,3400,t,.75),explode:[-.85,-.6,-.3]}),P(e)}var k=[{id:"heart",name:"Human Heart",category:"Anatomy",icon:"\u{1FAC0}",build:_t,tilt:-.12},{id:"eye",name:"Human Eye",category:"Anatomy",icon:"\u{1F441}",build:Ct,tilt:-.05},{id:"turbofan",name:"Turbofan Jet Engine",category:"Engines",icon:"\u2708",build:Tt,tilt:-.2},{id:"watch",name:"Mechanical Watch",category:"Machines",icon:"\u231A",build:zt,tilt:-.45},{id:"saturn",name:"Saturn V Rocket",category:"Machines",icon:"\u{1F680}",build:St,tilt:-.05},{id:"car",name:"Sports Car",category:"Vehicles",icon:"\u{1F3CE}",build:Et,tilt:-.25},{id:"eiffel",name:"Eiffel Tower",category:"Landmarks",icon:"\u{1F5FC}",build:Lt,tilt:-.05},{id:"dna",name:"DNA Double Helix",category:"Biology",icon:"\u{1F9EC}",build:At,tilt:-.1}];var F="none",V="fist",R="open",q="point",Y="pinch",$="peace",O=(t,e)=>Math.hypot(t.x-e.x,t.y-e.y,(t.z||0)-(e.z||0));function Ot(t){let e=t[0],o=[8,12,16,20],n=O(e,t[9])||1e-6,a=0;for(let r of o)a+=O(e,t[r]);return a/o.length/n}function W(t,e,o){let n=t[0];return O(t[e],n)>O(t[o],n)*1.12}function ht(t,e=.5){let o={gesture:F,hands:t.length,roll:0,pitch:0,pinch:0,pointX:.5,pointY:.5,zoom:0,open:0};if(!t.length)return o;let n=.5-e,a=1.62+n*.35,r=2.02-n*.32,l=t[0],c=Ot(l);o.open=Math.max(0,Math.min(1,(c-1.6)/.75));let u=l[9];o.roll=Math.atan2(u.x-l[0].x,-(u.y-l[0].y)),o.pitch=Math.atan2(l[5].y-l[17].y,.4);let d=O(l[0],l[9])||1e-6;o.pinch=Math.max(0,Math.min(1,1-O(l[4],l[8])/(d*1.05)));let i=W(l,8,6),h=W(l,12,10),f=W(l,16,14),m=W(l,20,18);if(o.pointX=l[8].x,o.pointY=l[8].y,t.length>=2){let x=O(t[0][9],t[1][9]);o.zoom=Math.max(-1,Math.min(1,(x-.35)*3))}return c<a&&!i&&!h?o.gesture=V:c>r?o.gesture=R:i&&h&&!f&&!m?o.gesture=$:i&&o.pinch>.72&&!h?o.gesture=Y:i&&!h&&!f&&!m&&(o.gesture=q),o}var G=class{constructor(){this.prev=0,this.cool=0}feed(e,o){this.cool=Math.max(0,this.cool-o);let n=!1;return this.cool===0&&this.prev-e>.42&&(n=!0,this.cool=1.2),this.prev=e,n}};var ut="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14",Ft="https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",J=class{constructor(e){this.video=e,this.landmarker=null,this.running=!1,this.hands=[],this.gesture=F,this.lastVideoTime=-1,this.onFrame=null,this.status="idle"}async start(){if(this.running)return!0;this.status="loading";let{FilesetResolver:e,HandLandmarker:o}=await import(`${ut}/vision_bundle.mjs`),n=await e.forVisionTasks(`${ut}/wasm`);this.landmarker=await o.createFromOptions(n,{baseOptions:{modelAssetPath:Ft,delegate:"GPU"},runningMode:"VIDEO",numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});let a=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},facingMode:"user"},audio:!1});return this.video.srcObject=a,await this.video.play(),this.running=!0,this.status="running",!0}stop(){this.running=!1,this.status="idle";let e=this.video.srcObject;e&&(e.getTracks().forEach(o=>o.stop()),this.video.srcObject=null)}poll(e,o=.5){if(!this.running||!this.landmarker)return null;let n=this.video;if(n.currentTime===this.lastVideoTime)return null;this.lastVideoTime=n.currentTime;let a;try{a=this.landmarker.detectForVideo(n,e)}catch{return null}return this.hands=a&&a.landmarks||[],this.gesture=ht(this.hands,o),this.handsInfo=this.gesture,this.gesture}};var p=t=>document.querySelector(t),z=(t,e,o)=>Math.max(e,Math.min(o,t)),ot=(t,e,o)=>t+(e-t)*o,j=p("#stage"),X=new U(j),st=new J(p("#cam")),It=new G,s={i:0,openness:0,targetOpen:0,yaw:0,pitch:0,zoom:1,sel:null,trail:!1,labels:!0,auto:!1,solid:!1,sensitivity:.5,handOn:!1,handLabel:"no hand",gesture:F,summoned:0,time:0,dragging:!1,lastX:0,lastY:0,pinchPull:0,quiz:!1,quizPart:null,score:0},_=null,nt=new Map;function Nt(t){return nt.has(t)||nt.set(t,k[t].build()),nt.get(t)}function B(t,{animate:e=!0}={}){s.i=(t%k.length+k.length)%k.length,_=Nt(s.i),X.setModel(_),s.sel=null,s.pitch=k[s.i].tilt||0,s.quizPart=null,p("#modelName").textContent=k[s.i].name,p("#partCount").textContent=`${_.parts.length} parts \xB7 ${_.count.toLocaleString()} particles`,Rt(),qt(),dt(null),e&&(s.openness=1.75,s.targetOpen=0,s.summoned=performance.now())}function Rt(){let t=p("#picker");t.innerHTML="";let e=[...new Set(k.map(o=>o.category))];for(let o of e){let n=document.createElement("div");n.className="cat",n.innerHTML=`<span class="catname">${o}</span>`,k.forEach((a,r)=>{if(a.category!==o)return;let l=document.createElement("button");l.className="chip"+(r===s.i?" on":""),l.innerHTML=`<span class="ic">${a.icon}</span>${a.name}`,l.onclick=()=>B(r),n.appendChild(l)}),t.appendChild(n)}}function qt(){let t=p("#labels");t.innerHTML="",_.parts.forEach(e=>{let o=document.createElement("button");o.className="lab",o.textContent=e.name,o.onclick=()=>H(e.name===s.sel?.name?null:e),t.appendChild(o),e.el=o})}function H(t){s.sel=t,_.parts.forEach(e=>e.el&&e.el.classList.toggle("on",e===t)),dt(t),X.setModelSel}function dt(t){let e=p("#info");if(!t){e.classList.remove("show");return}e.classList.add("show"),e.innerHTML=`<div class="infohead"><span class="dot"></span>${t.name}</div><p>${t.note||"Part of "+k[s.i].name+"."}</p>`}var pt=performance.now();function ft(t){let e=Math.min(.05,(t-pt)/1e3);if(pt=t,s.time+=e,st.running){let n=st.poll(t,s.sensitivity);if(n)if(s.handOn=n.hands>0,s.gesture=n.gesture,s.handLabel={[V]:"fist",[R]:"open hand",[q]:"pointing",[Y]:"pinch",[$]:"peace",[F]:"no hand"}[n.gesture]||"no hand",It.feed(n.open,e)&&(s.openness=1.9,s.targetOpen=0),n.hands>0){if(n.gesture===V?s.targetOpen=0:n.gesture===R?s.targetOpen=.92:n.gesture===$?at():n.gesture===Y?s.pinchPull=Math.min(1,s.pinchPull+e*2.4):s.pinchPull=Math.max(0,s.pinchPull-e*1.4),(n.gesture===R||n.gesture===q||n.gesture===F)&&(s.yaw=ot(s.yaw,-n.roll*1.6,.08),s.pitch=ot(s.pitch,(k[s.i].tilt||0)+z(n.pitch,-.5,.5)*.5,.05)),Math.abs(n.zoom)>.02&&(s.zoom=z(s.zoom+n.zoom*e*1.2,.45,2.6)),n.gesture===q){let a=mt(n.pointX*window.innerWidth,n.pointY*window.innerHeight);a&&a!==s.sel&&H(a)}}else s.targetOpen=s.targetOpen}else s.handLabel="camera off",s.handOn=!1;s.auto&&(s.yaw+=e*.35),s.openness=ot(s.openness,s.targetOpen,1-Math.pow(.0016,e));let o=z(s.openness+s.pinchPull*(s.quizPart?.5:.25),0,2);X.draw({open:o,sel:s.sel?_.parts.indexOf(s.sel):-1,time:s.time,trail:s.trail,zoom:s.zoom,yaw:s.yaw,pitch:s.pitch,solid:s.solid,alpha:.9}),Bt(),Ht(),requestAnimationFrame(ft)}function Bt(){let t=s.labels&&s.openness>.18;if(p("#labels").classList.toggle("show",t),!!t)for(let e of _.parts){if(!e.el)continue;let o=e.centre,[n,a,r]=X.screenOf(o[0],o[1],o[2]);e.el.style.transform=`translate(${Math.round(n)}px, ${Math.round(a)}px) translate(-50%,-50%)`,e.el.style.opacity=r>0?1:0}}function mt(t,e){let o=null,n=46;for(let a of _.parts){let[r,l]=X.screenOf(a.centre[0],a.centre[1],a.centre[2]),c=Math.hypot(r-t,l-e);c<n&&(n=c,o=a)}return o}function Ht(){p("#handLabel").textContent=s.handLabel,p("#sceneLabel").textContent=s.openness>1.35?"dispersed":s.openness>.2?"exploded":"formed",p("#openVal").textContent=Math.round(z(s.openness,0,1)*100)+"%",s.quizPart?(p("#quizBar").classList.add("show"),p("#quizTarget").textContent=s.quizPart.name):p("#quizBar").classList.remove("show")}function at(){performance.now()-s.summoned<900||(s.summoned=performance.now(),B(s.i+1))}j.addEventListener("pointerdown",t=>{s.dragging=!0,s.lastX=t.clientX,s.lastY=t.clientY;let e=mt(t.clientX,t.clientY);e&&H(e.name===s.sel?.name?null:e),j.setPointerCapture(t.pointerId)});j.addEventListener("pointermove",t=>{s.dragging&&(s.yaw+=(t.clientX-s.lastX)*.008,s.pitch=z(s.pitch+(t.clientY-s.lastY)*.006,-1.2,1.2),s.lastX=t.clientX,s.lastY=t.clientY)});addEventListener("pointerup",()=>{s.dragging=!1});j.addEventListener("wheel",t=>{t.preventDefault(),s.zoom=z(s.zoom*(1-Math.sign(t.deltaY)*.09),.45,2.6)},{passive:!1});addEventListener("keydown",t=>{let e=t.key.toLowerCase();e===" "?(t.preventDefault(),s.openness=1.9,s.targetOpen=0):e==="f"?s.targetOpen=0:e==="o"?s.targetOpen=.92:e==="v"||e==="arrowright"?at():e==="arrowleft"?B(s.i-1):e==="arrowup"?s.targetOpen=z(s.targetOpen+.12,0,1):e==="arrowdown"?s.targetOpen=z(s.targetOpen-.12,0,1):e==="r"?s.auto=!s.auto:e==="l"?s.labels=!s.labels:e==="t"?s.trail=!s.trail:e==="s"?s.solid=!s.solid:e==="b"?p("#picker").classList.toggle("show"):e==="h"||e==="?"?p("#help").classList.toggle("show"):e==="q"&&Q()});function Q(){let t=_.parts.filter(e=>e.note);t.length&&(s.quizPart=t[Math.floor(Math.random()*t.length)],s.quiz=!0,s.targetOpen=.92,p("#quizBar").classList.add("show"))}p("#quizSkip").onclick=()=>Q();p("#quizDone").onclick=()=>{s.quizPart=null,p("#quizBar").classList.remove("show")};var Dt=H;H=function(t){if(s.quizPart&&t){let e=t.name===s.quizPart.name;p("#quizResult").textContent=e?"\u2713 correct":`\u2717 that was ${t.name}`,p("#quizResult").className="quizres "+(e?"ok":"bad"),setTimeout(()=>{p("#quizResult").textContent="",e&&Q()},1400)}return Dt(t)};p("#btnCamera").onclick=async()=>{let t=p("#btnCamera");try{t.disabled=!0,t.textContent="Starting camera\u2026",await st.start(),t.textContent="Camera on",t.classList.add("on"),p("#welcome").classList.remove("show"),p("#handBadge").classList.add("live")}catch{t.disabled=!1,t.textContent="Camera blocked \u2014 use mouse",p("#camNote").textContent="Camera permission was refused or unavailable. You can still explore with drag, scroll and the buttons."}};p("#btnNoCam").onclick=()=>{p("#welcome").classList.remove("show"),s.targetOpen=.35};p("#sens").oninput=t=>{s.sensitivity=Number(t.target.value)/100,p("#sensVal").textContent=t.target.value>60?"More forgiving":t.target.value<40?"Strict":"Standard"};p("#tTrail").onclick=()=>{s.trail=!s.trail,p("#tTrail").classList.toggle("on",s.trail)};p("#tLabels").onclick=()=>{s.labels=!s.labels,p("#tLabels").classList.toggle("on",s.labels)};p("#tAuto").onclick=()=>{s.auto=!s.auto,p("#tAuto").classList.toggle("on",s.auto)};p("#tSolid").onclick=()=>{s.solid=!s.solid,p("#tSolid").classList.toggle("on",s.solid)};p("#tPicker").onclick=()=>p("#picker").classList.toggle("show");p("#tHelp").onclick=()=>p("#help").classList.toggle("show");p("#tQuiz").onclick=()=>Q();p("#helpClose").onclick=()=>p("#help").classList.remove("show");p("#infoClose").onclick=()=>H(null);p("#btnNext").onclick=()=>at();p("#btnPrev").onclick=()=>B(s.i-1);p("#btnForm").onclick=()=>{s.targetOpen=0};p("#btnExplode").onclick=()=>{s.targetOpen=.92};addEventListener("dragover",t=>t.preventDefault());addEventListener("drop",async t=>{t.preventDefault();let e=t.dataTransfer.files&&t.dataTransfer.files[0];if(e)try{let o=JSON.parse(await e.text()),n=(o.parts||[]).map(r=>({name:r.name||"Part",note:r.note||"",color:r.color||[.6,.8,1],points:r.points.flat()}));if(!n.length)throw new Error("no parts");let a=P(n);k.push({id:"custom-"+Date.now(),name:o.name||e.name.replace(".json",""),category:"Yours",icon:"\u{1F4E6}",build:()=>a,tilt:0}),B(k.length-1),p("#info").classList.add("show"),p("#info").innerHTML=`<div class="infohead"><span class="dot"></span>${o.name||"Custom model"} loaded</div><p>Added from ${e.name}. It stays for this session only.</p>`}catch(o){p("#info").classList.add("show"),p("#info").innerHTML=`<div class="infohead"><span class="dot"></span>Could not read that file</div><p>Expected {name, parts:[{name, color, points:[[x,y,z]...]}]}. ${o.message}</p>`}});B(0,{animate:!0});requestAnimationFrame(ft);setTimeout(()=>p("#welcome").classList.add("show"),300);
+
+</script>
+</body>
+</html>
