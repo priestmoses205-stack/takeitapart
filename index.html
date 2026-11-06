@@ -226,14 +226,14 @@ header > * { pointer-events: auto; }
 #cam {
   position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover;
   transform: scaleX(-1); opacity: 0; pointer-events: none; z-index: 0;
-  filter: grayscale(0.35) contrast(1.05) brightness(0.78) saturate(0.85) blur(0.3px);
+  filter: grayscale(0.35) contrast(1.05) brightness(0.86) saturate(0.85) blur(0.3px);
   transition: opacity 1.2s ease;
 }
-#cam.live { opacity: 0.52; }
+#cam.live { opacity: 0.62; }
 #scrim {
   position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0; transition: opacity 1.2s ease;
   background:
-    radial-gradient(70% 60% at 50% 45%, rgba(8, 8, 12, 0.02) 0%, rgba(8, 8, 12, 0.48) 64%, rgba(8, 8, 12, 0.88) 100%),
+    radial-gradient(70% 60% at 50% 45%, rgba(8, 8, 12, 0.02) 0%, rgba(8, 8, 12, 0.40) 64%, rgba(8, 8, 12, 0.88) 100%),
     linear-gradient(180deg, rgba(8, 8, 12, 0.72) 0%, rgba(8, 8, 12, 0) 22%, rgba(8, 8, 12, 0) 74%, rgba(8, 8, 12, 0.85) 100%);
 }
 #scrim.live { opacity: 1; }
